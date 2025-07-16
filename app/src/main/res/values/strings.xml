@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Week10</string>
+    <string name="defaultWebClientId">812383136186-bmc082ukkl6im8v60er495vabariso43.apps.googleusercontent.com</string>
+    <string name="GoogleLoginBtnText">Log In with Google</string>
+    <string name="GoogleSignInBtnText">Sign Up with Google</string>
+    <string name="signUpWithFacebookText">Sign Up with Facebook</string>
+    <string name="facebook_app_id">24255008837428304</string>
+    <string name="fb_login_protocol_scheme">fb24255008837428304</string>
+    <string name="facebook_client_token">56789</string>
+    <string name="sign_in_text">Sign In</string>
+</resources>
