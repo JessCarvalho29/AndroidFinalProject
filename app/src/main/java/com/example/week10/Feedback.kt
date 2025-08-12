@@ -23,8 +23,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
+import androidx.core.net.toUri
 
 
 private const val currentPage = "Feedback"
@@ -40,7 +42,7 @@ class Feedback : AppCompatActivity() {
         setContentView(R.layout.activity_feedback)
 
         db = FirebaseFirestore.getInstance()
-        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        val auth = FirebaseAuth.getInstance()
 
         val feedback = findViewById<EditText>(R.id.editTextTextMultiLine)
         feedback.setText(myViewModel.feedback)
@@ -51,8 +53,8 @@ class Feedback : AppCompatActivity() {
         })
 
         findViewById<Button>(R.id.buttonSubmit).setOnClickListener {
-            val feedbackText = feedback.text.toString()
-            if (feedbackText.isBlank()){
+            val feedbackText = feedback.text.toString().trim()
+            if (feedbackText.isBlank()) {
                 Log.d(currentPage, "Feedback cannot be empty")
                 Toast.makeText(this, "Feedback name cannot be empty", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -61,29 +63,30 @@ class Feedback : AppCompatActivity() {
             analyzeSentiment(feedbackText) { analysis ->
                 runOnUiThread {
                     val userFeedback = hashMapOf(
-                        "feedback" to feedbackText.trim(),
+                        "feedback" to feedbackText,
                         "userSatisfactionLevel" to analysis
                     )
                     Log.d(currentPage, analysis)
 
+                    val userId = auth.currentUser?.uid
                     if (userId != null) {
                         db.collection("feedbacks").document(userId).set(userFeedback)
                             .addOnSuccessListener {
                                 Log.d(currentPage, "Data saved successfully!")
+                                sendEmail(userId, feedbackText, analysis)
+                                Toast.makeText(this, "Thank you for your feedback!", Toast.LENGTH_LONG).show()
+                                auth.signOut()
                                 val intent = Intent(this, MainActivity::class.java)
                                 startActivity(intent)
                                 finish()
                             }
-                            .addOnFailureListener {
-                                    e -> Log.e(currentPage, "Failed to save data. ${e.message}")
+                            .addOnFailureListener { e ->
+                                Log.e(currentPage, "Failed to save data. ${e.message}")
                             }
                     }
                 }
-                }
-
             }
-
-
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -92,22 +95,56 @@ class Feedback : AppCompatActivity() {
         }
     }
 
+    private fun sendEmail(userId: String, feedback: String, satisfactionLevel: String){
+        val managerEmail = "jessicacarvalho.rosendo@gmail.com"
+        val subject = "User satisfaction report"
+        val body = """
+            Feedback Report:
+
+            UserId: $userId
+            Feedback : $feedback
+            Satisfaction Level: $satisfactionLevel
+
+        """.trimIndent()
+
+
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = "mailto:".toUri()
+            putExtra(Intent.EXTRA_EMAIL, managerEmail)
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, body)
+        }
+        startActivity(intent)
+    }
+
     fun analyzeSentiment(text: String, callback: (String) -> Unit) {
-        val applicationInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
-        val bundle = applicationInfo.metaData
-        val apiKey = bundle?.getString("com.google.android.geo.API_KEY") ?: ""
+        val apiKey = try {
+            val appInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
+            appInfo.metaData.getString("com.google.android.language.API_KEY")
+        } catch (e: PackageManager.NameNotFoundException) {
+            Log.e(currentPage, "Failed to load meta-data", e)
+            callback("Analysis Error")
+            return
+        }
+
+        if (apiKey.isNullOrEmpty()) {
+            Log.e(currentPage, "API key not found in AndroidManifest.xml")
+            callback("Analysis Error")
+            return
+        }
 
         val url = "https://language.googleapis.com/v1/documents:analyzeSentiment?key=$apiKey"
 
+        val sanitizedText = text.replace("\"", "\\\"")
         val json = """
-    {
-      "document": {
-        "type": "PLAIN_TEXT",
-        "content": "$text"
-      },
-      "encodingType": "UTF8"
-    }
-    """.trimIndent()
+            {
+              "document": {
+                "type": "PLAIN_TEXT",
+                "content": "$sanitizedText"
+              },
+              "encodingType": "UTF8"
+            }
+        """.trimIndent()
 
         val client = OkHttpClient()
         val mediaType = "application/json; charset=utf-8".toMediaType()
@@ -125,16 +162,26 @@ class Feedback : AppCompatActivity() {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                response.use {
-                    if (!response.isSuccessful) {
-                        val errorBody = response.body?.string()
-                        Log.e(currentPage, "API error: $errorBody")
-                        callback("Error")
-                        return
-                    }
-                    val jsonResponse = JSONObject(response.body?.string() ?: "{}")
+                val responseBody = response.body?.string()
+                if (!response.isSuccessful) {
+                    Log.e(currentPage, "Sentiment API Error: ${response.code} ${responseBody}")
+                    callback("Analysis Error")
+                    return
+                }
+
+                try {
+                    val jsonResponse = JSONObject(responseBody ?: "")
                     val score = jsonResponse.getJSONObject("documentSentiment").getDouble("score")
-                    callback(score.toString())
+                    val satisfaction = when {
+                        score >= 0.75 -> "Very satisfied"
+                        score < 0.75 && score >= 0.25 -> "Satisfied"
+                        score < -0.25 -> "Not satisfied"
+                        else -> "Neutral"
+                    }
+                    callback(satisfaction)
+                } catch (e: JSONException) {
+                    Log.e(currentPage, "Failed to parse sentiment JSON response", e)
+                    callback("Analysis Error")
                 }
             }
         })
