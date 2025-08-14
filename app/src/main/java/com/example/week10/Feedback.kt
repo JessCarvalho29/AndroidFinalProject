@@ -110,11 +110,17 @@ class Feedback : AppCompatActivity() {
 
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             data = "mailto:".toUri()
-            putExtra(Intent.EXTRA_EMAIL, managerEmail)
+            putExtra(Intent.EXTRA_EMAIL, arrayOf(managerEmail))
             putExtra(Intent.EXTRA_SUBJECT, subject)
             putExtra(Intent.EXTRA_TEXT, body)
         }
-        startActivity(intent)
+        try {
+            startActivity(Intent.createChooser(intent, "Send Email"))
+        } catch (ex: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, "No email client installed.", Toast.LENGTH_SHORT).show()
+            Log.e(currentPage, "Failed to send email: $ex")
+        }
+
     }
 
     fun analyzeSentiment(text: String, callback: (String) -> Unit) {

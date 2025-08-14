@@ -48,6 +48,7 @@ class Camera : AppCompatActivity() {
     private lateinit var videoView: VideoView
     private lateinit var imageCapture: ImageCapture
     private lateinit var cameraExecutor: ExecutorService
+    private lateinit var returnToCamera : Button
     private var photoUri: Uri ? = null
     private val storage = FirebaseStorage.getInstance()
     private lateinit var videoCapture: VideoCapture<Recorder>
@@ -74,6 +75,7 @@ class Camera : AppCompatActivity() {
         previewView = findViewById(R.id.previewView)
         imageView = findViewById(R.id.imageView)
         videoView = findViewById(R.id.videoView)
+        returnToCamera =  findViewById(R.id.buttonReturnVideo)
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
@@ -87,11 +89,21 @@ class Camera : AppCompatActivity() {
             takePhoto()
         }
 
+        returnToCamera.setOnClickListener {
+            previewView.visibility = View.VISIBLE
+            imageView.visibility = View.GONE
+            videoView.visibility = View.GONE
+            returnToCamera.visibility = View.GONE
+        }
+
         findViewById<Button>(R.id.btnExtractPhoto).setOnClickListener {
             if (photoUri != null) {
+                previewView.visibility = View.GONE
                 imageView.visibility = View.VISIBLE
                 videoView.visibility = View.GONE
+                returnToCamera.visibility = View.VISIBLE
                 imageView.setImageURI(photoUri)
+                imageView.invalidate()
             } else {
                 showToast("No photo available")
             }
@@ -113,8 +125,10 @@ class Camera : AppCompatActivity() {
         // EXTRA FEATURE
         findViewById<Button>(R.id.btnExtractVideo).setOnClickListener {
             if (videoUri != null) {
+                previewView.visibility = View.GONE
                 imageView.visibility = View.GONE
                 videoView.visibility = View.VISIBLE
+                returnToCamera.visibility = View.VISIBLE
                 videoView.setVideoURI(videoUri)
                 videoView.start()
             } else {

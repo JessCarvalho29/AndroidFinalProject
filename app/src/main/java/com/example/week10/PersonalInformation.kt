@@ -112,7 +112,7 @@ class PersonalInformation : AppCompatActivity() {
             finish()
         }
 
-        findViewById<Button>(R.id.buttonNext).setOnClickListener {
+        findViewById<ImageButton>(R.id.buttonNext).setOnClickListener {
             val intent = Intent(this, QuestionAndMedia::class.java)
             startActivity(intent)
         }

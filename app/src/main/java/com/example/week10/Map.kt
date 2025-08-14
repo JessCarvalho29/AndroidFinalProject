@@ -49,7 +49,7 @@ class Map : AppCompatActivity(), OnMapReadyCallback {
             finish()
         }
 
-        findViewById<Button>(R.id.buttonNext).setOnClickListener {
+        findViewById<ImageButton>(R.id.buttonNext).setOnClickListener {
             val intent = Intent(this, Camera::class.java)
             startActivity(intent)
         }

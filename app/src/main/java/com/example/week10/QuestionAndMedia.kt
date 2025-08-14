@@ -101,7 +101,7 @@ class QuestionAndMedia : AppCompatActivity() {
             finish()
         }
 
-        findViewById<Button>(R.id.buttonNext).setOnClickListener {
+        findViewById<ImageButton>(R.id.buttonNext).setOnClickListener {
             val intent = Intent(this, Map::class.java)
             startActivity(intent)
         }
